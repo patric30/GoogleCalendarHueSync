@@ -110,7 +110,7 @@ def sync_calendar_with_hue():
                 event_detail['after'] = 999
                 # Add event details to dict.
                 event_dict[id] = event_detail
-                print('Start: ' + start + ', End: ' + end + ', Title: ' + event['summary'])
+                print('Start: ' + start + ', End: ' + end + ', Duration: ' + str(duration) + ', Before: ' + str(before) + ', Title: ' + event['summary'])
                 # Set time after the meeting for previous event.
                 if last_event_id != '':
                     event_dict[last_event_id]['after'] = before
@@ -147,8 +147,8 @@ def sync_calendar_with_hue():
     # Set new schedules for each meeting.
     first_event = True
     for event in event_dict:
+        # Indicate upcoming meetings before first meeting.
         if first_event:
-            # Indicate upcoming meetings before first meeting.
             data = {'on': True, 'scene': scenes_dict[hue_scene_meetinglater]}
             start = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
             # Only set schedule if meeting is more than 10 minutes away.
@@ -156,11 +156,13 @@ def sync_calendar_with_hue():
                 b.create_group_schedule(event+'_first', start, groups_dict[hue_group], data, 'Calendar' )
                 print('Start: ' + start + ' Scene: ' + hue_scene_meetinglater)
             first_event = False
-        start = datetime.datetime.strptime(event_dict[event]['start'], '%Y-%m-%dT%H:%M:%S') - datetime.timedelta(minutes=10)
-        start = (start).strftime('%Y-%m-%dT%H:%M:%S')
-        data = {'on': True, 'scene': scenes_dict[heu_scene_meetingsoon]}
-        b.create_group_schedule(event+'_on', start, groups_dict[hue_group], data, 'Calendar' )
-        print('Start: ' + start + ' Scene: ' + heu_scene_meetingsoon)
+        # Indicate meeting to start soon if there was a >10 min break between meetings.
+        if event_dict[event]['before'] >= 10:
+            start = datetime.datetime.strptime(event_dict[event]['start'], '%Y-%m-%dT%H:%M:%S') - datetime.timedelta(minutes=10)
+            start = (start).strftime('%Y-%m-%dT%H:%M:%S')
+            data = {'on': True, 'scene': scenes_dict[heu_scene_meetingsoon]}
+            b.create_group_schedule(event+'_on', start, groups_dict[hue_group], data, 'Calendar' )
+            print('Start: ' + start + ' Scene: ' + heu_scene_meetingsoon)
         data = {'on': True, 'scene': scenes_dict[heu_scene_meeting]}
         start = event_dict[event]['start']
         b.create_group_schedule(event+'_on', start, groups_dict[hue_group], data, 'Calendar' )
@@ -178,10 +180,11 @@ def sync_calendar_with_hue():
             print('Start: ' + start + ' Scene: ' + 'OFF')
         else:
             # more meetings to come  - signalized more meetings.
-            data = {'on': True, 'scene': scenes_dict[hue_scene_meetinglater]}
-            start = event_dict[event]['end']
-            b.create_group_schedule(event+'_more', start, groups_dict[hue_group], data, 'Calendar' )
-            print('Start: ' + start + ' Scene: ' + hue_scene_meetinglater)
+            if event_dict[event]['after'] >= 1:
+                data = {'on': True, 'scene': scenes_dict[hue_scene_meetinglater]}
+                start = event_dict[event]['end']
+                b.create_group_schedule(event+'_more', start, groups_dict[hue_group], data, 'Calendar' )
+                print('Start: ' + start + ' Scene: ' + hue_scene_meetinglater)
 
     print('')
     print('Done.')
