@@ -1,6 +1,8 @@
 # GoogleCalendarHueSync
 Synchronize Google Calendar Meetings with Hue Lights
 
+I am using Philips Hue Play Bar lights to a) indicate my upcoming meetings and b) light up my face for better video quality. Using a manual switch to turn on/off the lights works well but is not sophisticated enough. What if the lights would know about my meeting schedule and simply guides me through my day. 
+
 Steps:
 1. Get Philips 7820330U7_2 Hue Play Bar and a Philips Hue Bridge.
 2. Setup Calandar API access for your Google Calendar: https://developers.google.com/calendar/quickstart/python
