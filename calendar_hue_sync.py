@@ -12,11 +12,11 @@ from phue import Bridge
 # If modifying the scope, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 # Connect Philips Hue Bridge.
-b = Bridge('192.168.178.66')
+b = Bridge('192.168.178.xxx')
 # Define user.
-user_email = 'muehlbauer@google.com'
+user_email = 'user@gmail.com'
 # Skip events created by these creators.
-blocked_creators = ['cortina1996@gmail.com']
+blocked_creators = ['blocked@gmail.com']
 # Room to be controlled by hue bridge.
 hue_group = 'Office'
 # Available Scenes of this Room.
@@ -62,7 +62,7 @@ def sync_calendar_with_hue():
     # Identify VC events and add into list.
     last_event_id = ''
     for event in events:
-        id          = event.get('id', '')
+        id          = event.get('id', '')[0:26]
         attendees   = event.get('attendees', [])
         creator     = event.get('creator', {})
         hangoutLink = event.get('hangoutLink', '')
@@ -146,7 +146,9 @@ def sync_calendar_with_hue():
         print('')
     # Set new schedules for each meeting.
     first_event = True
+    count = 0
     for event in event_dict:
+        #print(event_dict)
         # Indicate upcoming meetings before first meeting.
         if first_event:
             data = {'on': True, 'scene': scenes_dict[hue_scene_meetinglater]}
@@ -161,22 +163,26 @@ def sync_calendar_with_hue():
             start = datetime.datetime.strptime(event_dict[event]['start'], '%Y-%m-%dT%H:%M:%S') - datetime.timedelta(minutes=10)
             start = (start).strftime('%Y-%m-%dT%H:%M:%S')
             data = {'on': True, 'scene': scenes_dict[heu_scene_meetingsoon]}
-            b.create_group_schedule(event+'_on', start, groups_dict[hue_group], data, 'Calendar' )
+            b.create_group_schedule(event+'_soon', start, groups_dict[hue_group], data, 'Calendar' )
+            count += 1
             print('Start: ' + start + ' Scene: ' + heu_scene_meetingsoon)
         data = {'on': True, 'scene': scenes_dict[heu_scene_meeting]}
         start = event_dict[event]['start']
         b.create_group_schedule(event+'_on', start, groups_dict[hue_group], data, 'Calendar' )
+        count += 1
         print('Start: ' + start + " Scene: " + heu_scene_meeting)
         if event_dict[event]['after'] == 999:
             # Last meeting of the day - switch into Gaming mode.
             data = {'on': True, 'scene': scenes_dict[hue_scene_chill]}
             start = event_dict[event]['end']
             b.create_group_schedule(event+'_last', start, groups_dict[hue_group], data, 'Calendar' )
+            count += 1
             print('Start: ' + start + ' Scene: ' + hue_scene_chill)
             # Turn off lights at 10pm.
             data = {'on': False}
             start = datetime.datetime.now().strftime('%Y-%m-%d')+'T23:00:00'
             b.create_group_schedule(event+'_off', start, groups_dict[hue_group], data, 'Calendar' )
+            count += 1
             print('Start: ' + start + ' Scene: ' + 'OFF')
         else:
             # more meetings to come  - signalized more meetings.
@@ -184,10 +190,11 @@ def sync_calendar_with_hue():
                 data = {'on': True, 'scene': scenes_dict[hue_scene_meetinglater]}
                 start = event_dict[event]['end']
                 b.create_group_schedule(event+'_more', start, groups_dict[hue_group], data, 'Calendar' )
+                count += 1
                 print('Start: ' + start + ' Scene: ' + hue_scene_meetinglater)
 
     print('')
-    print('Done.')
+    print(str(len(b.get_schedule())) + ' of ' + str(count) + ' schedule(s) created.')
 
 def main():
     sync_calendar_with_hue()
