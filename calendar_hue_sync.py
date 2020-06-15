@@ -97,7 +97,11 @@ def sync_calendar_with_hue():
             if last_event_id == '':
                 before = int((start_datetime - datetime.datetime.now()).seconds / 60)
             else:
-                before = int((start_datetime - datetime.datetime.strptime(event_dict[last_event_id]['end'], '%Y-%m-%dT%H:%M:%S')).seconds / 60)
+                last_end_datetime = datetime.datetime.strptime(event_dict[last_event_id]['end'], '%Y-%m-%dT%H:%M:%S')
+                if last_end_datetime > start_datetime:
+                    before = 0
+                else:
+                    before = int((start_datetime - last_end_datetime).seconds / 60)
             # Only continue for events on the same day.
             if end_day == now_day:
                 event_detail = {}
@@ -110,7 +114,6 @@ def sync_calendar_with_hue():
                 event_detail['after'] = 999
                 # Add event details to dict.
                 event_dict[id] = event_detail
-                print('Start: ' + start + ', End: ' + end + ', Duration: ' + str(duration) + ', Before: ' + str(before) + ', Title: ' + event['summary'])
                 # Set time after the meeting for previous event.
                 if last_event_id != '':
                     event_dict[last_event_id]['after'] = before
@@ -119,10 +122,29 @@ def sync_calendar_with_hue():
                 # Exit loop after last event of the day
                 break
 
+    # Resolve overlapping events and print all events.
+    for event in event_dict:
+        start = datetime.datetime.strptime(event_dict[event]['start'], '%Y-%m-%dT%H:%M:%S')
+        end = datetime.datetime.strptime(event_dict[event]['end'], '%Y-%m-%dT%H:%M:%S')
+        for check_event in event_dict:
+            check_start = datetime.datetime.strptime(event_dict[check_event]['start'], '%Y-%m-%dT%H:%M:%S')
+            check_end = datetime.datetime.strptime(event_dict[check_event]['end'], '%Y-%m-%dT%H:%M:%S')
+            if check_start < start and check_end > start:
+                event_dict[event]['before'] = 0
+            if check_end > end and check_start < end:
+                event_dict[event]['after'] = 0
+        print('Start: ' + event_dict[event]['start'] \
+              +  ', End: ' + event_dict[event]['end'] \
+              + ', Duration: ' + str(event_dict[event]['duration']) \
+              + ', Before: ' + str(event_dict[event]['before']) \
+              + ', After: ' + str(event_dict[event]['after']) \
+              + ', Title: ' + event_dict[event]['title'])
+
     # Setup Schedule for Philips Hue lights.
     print('')
     print('Set Hue Schedule:')
-    # If the app is not registered and the button is not pressed, press the button and call connect() (this only needs to be run a single time)
+    # If the app is not registered and the button is not pressed, press the
+    # button and call connect() (this only needs to be run a single time)
     b.connect()
     # Get available groups.
     groups = b.get_group()
@@ -142,7 +164,7 @@ def sync_calendar_with_hue():
             b.delete_schedule(schedule)
             count += 1
     if count > 0:
-        print(str(count) + ' schedules deleted.')
+        print(str(count) + ' remaining schedules deleted.')
         print('')
     # Set new schedules for each meeting.
     first_event = True
@@ -198,6 +220,3 @@ def sync_calendar_with_hue():
 
 def main():
     sync_calendar_with_hue()
-
-if __name__ == '__main__':
-    main()
