@@ -1,7 +1,10 @@
+#!/usr/bin/env python3
+# Author: Markus muehlbauer
+
 from __future__ import print_function
 import datetime
-import pickle
 import os.path
+import pickle
 import time
 import schedule
 from googleapiclient.discovery import build
@@ -12,9 +15,9 @@ from phue import Bridge
 # If modifying the scope, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 # Connect Philips Hue Bridge.
-b = Bridge('192.168.178.xxx')
+b = Bridge('192.168.178.66')
 # Define user.
-user_email = 'user@gmail.com'
+user_account = 'user@gmail.com'
 # Skip events created by these creators.
 blocked_creators = ['blocked@gmail.com']
 # Room to be controlled by hue bridge.
@@ -24,6 +27,18 @@ heu_scene_meeting = 'Meeting'
 heu_scene_meetingsoon = 'MeetingSoon'
 hue_scene_meetinglater = 'MeetingLater'
 hue_scene_chill = 'Chill'
+
+def datetime2str(dt):
+    return (dt).strftime('%Y-%m-%dT%H:%M:%S')
+
+def str2datetime(st):
+    return datetime.datetime.strptime(st, '%Y-%m-%dT%H:%M:%S')
+
+def add_minutes(dt, min):
+    return dt + datetime.timedelta(minutes=min)
+
+def duration_minutes(start_dt, end_dt):
+    return int((start_dt - end_dt).seconds / 60)
 
 def sync_calendar_with_hue():
     # Get upcoming meetings from Calendar.
@@ -67,41 +82,42 @@ def sync_calendar_with_hue():
         creator     = event.get('creator', {})
         hangoutLink = event.get('hangoutLink', '')
         responseStatus = ''
+        # Get event response status.
         for attendee in attendees:
-            if attendee['email'] == user_email:
+            if attendee['email'] == user_account:
                 responseStatus = attendee['responseStatus']
         # Check if event is accepted, with a hangouts link, not created by blocked creators and more than 1 participatns.
         if responseStatus == 'accepted' and hangoutLink != '' and creator['email'] not in blocked_creators and len(attendees) > 1:
             start = event['start'].get('dateTime', event['start'].get('date'))[:-6]
             end = event['end'].get('dateTime', event['end'].get('date'))[:-6]
-            start_datetime = datetime.datetime.strptime(start, '%Y-%m-%dT%H:%M:%S')
-            end_datetime = datetime.datetime.strptime(end, '%Y-%m-%dT%H:%M:%S')
+            start_datetime = str2datetime(start)
+            end_datetime = str2datetime(end)
             end_minute = int(end_datetime.strftime('%M'))
             end_day = int(end_datetime.strftime('%d'))
             now_day = int(datetime.datetime.now().strftime('%d'))
             # Round up end time to full half hour.
             if end_minute > 0 and end_minute<= 29:
-                end_datetime = end_datetime + datetime.timedelta(minutes=30 - end_minute)
-                end = (end_datetime).strftime('%Y-%m-%dT%H:%M:%S')
+                end_datetime = add_minutes(end_datetime, 30 - end_minute)
+                end = datetime2str(end_datetime)
             # Round up end time to full hour.
             if end_minute > 30 and end_minute <= 59:
-                end_datetime = end_datetime + datetime.timedelta(minutes=60 - end_minute)
-                end = (end_datetime).strftime('%Y-%m-%dT%H:%M:%S')
-            # Set start to now+1 if meeting has already started.
+                end_datetime = add_minutes(end_datetime, 60 - end_minute)
+                end = datetime2str(end_datetime)
+            # Set start to now if meeting has already started.
             if start_datetime <= datetime.datetime.now():
-                start_datetime = datetime.datetime.now() + datetime.timedelta(minutes=1)
-                start = (start_datetime).strftime('%Y-%m-%dT%H:%M:%S')
+                start_datetime = datetime.datetime.now()
+                start = datetime2str(end_datetime)(start_datetime)
             # Calculate meeting duration
             duration = int((end_datetime - start_datetime).seconds / 60)
             # Calculate time before the meeting.
             if last_event_id == '':
-                before = int((start_datetime - datetime.datetime.now()).seconds / 60)
+                before = duration_minutes(start_datetime, datetime.datetime.now())
             else:
-                last_end_datetime = datetime.datetime.strptime(event_dict[last_event_id]['end'], '%Y-%m-%dT%H:%M:%S')
+                last_end_datetime = str2datetime(event_dict[last_event_id]['end'])
                 if last_end_datetime > start_datetime:
                     before = 0
                 else:
-                    before = int((start_datetime - last_end_datetime).seconds / 60)
+                    before = duration_minutes(start_datetime, last_end_datetime)
             # Only continue for events on the same day.
             if end_day == now_day:
                 event_detail = {}
@@ -124,11 +140,11 @@ def sync_calendar_with_hue():
 
     # Resolve overlapping events and print all events.
     for event in event_dict:
-        start = datetime.datetime.strptime(event_dict[event]['start'], '%Y-%m-%dT%H:%M:%S')
-        end = datetime.datetime.strptime(event_dict[event]['end'], '%Y-%m-%dT%H:%M:%S')
+        start = str2datetime(event_dict[event]['start'])
+        end = str2datetime(event_dict[event]['end'])
         for check_event in event_dict:
-            check_start = datetime.datetime.strptime(event_dict[check_event]['start'], '%Y-%m-%dT%H:%M:%S')
-            check_end = datetime.datetime.strptime(event_dict[check_event]['end'], '%Y-%m-%dT%H:%M:%S')
+            check_start = str2datetime(event_dict[check_event]['start'])
+            check_end = str2datetime(event_dict[check_event]['end'])
             if check_start < start and check_end > start:
                 event_dict[event]['before'] = 0
             if check_end > end and check_start < end:
@@ -174,29 +190,31 @@ def sync_calendar_with_hue():
         # Indicate upcoming meetings before first meeting.
         if first_event:
             data = {'on': True, 'scene': scenes_dict[hue_scene_meetinglater]}
-            start = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+            start = datetime2str(datetime.datetime.now())
             # Only set schedule if meeting is more than 10 minutes away.
-            if datetime.datetime.now() < datetime.datetime.strptime(event_dict[event]['start'], '%Y-%m-%dT%H:%M:%S') - datetime.timedelta(minutes=10):
+            if datetime.datetime.now() < add_minutes(str2datetime(event_dict[event]['start']), -10):
                 b.create_group_schedule(event+'_first', start, groups_dict[hue_group], data, 'Calendar' )
                 print('Start: ' + start + ' Scene: ' + hue_scene_meetinglater)
             first_event = False
         # Indicate meeting to start soon if there was a >10 min break between meetings.
         if event_dict[event]['before'] >= 10:
-            start = datetime.datetime.strptime(event_dict[event]['start'], '%Y-%m-%dT%H:%M:%S') - datetime.timedelta(minutes=10)
-            start = (start).strftime('%Y-%m-%dT%H:%M:%S')
+            start = add_minutes(str2datetime(event_dict[event]['start']), -10)
+            start = datetime2str(start)
             data = {'on': True, 'scene': scenes_dict[heu_scene_meetingsoon]}
             b.create_group_schedule(event+'_soon', start, groups_dict[hue_group], data, 'Calendar' )
             count += 1
             print('Start: ' + start + ' Scene: ' + heu_scene_meetingsoon)
+        # Start actual meeting.
         data = {'on': True, 'scene': scenes_dict[heu_scene_meeting]}
         start = event_dict[event]['start']
         b.create_group_schedule(event+'_on', start, groups_dict[hue_group], data, 'Calendar' )
         count += 1
         print('Start: ' + start + " Scene: " + heu_scene_meeting)
         if event_dict[event]['after'] == 999:
-            # Last meeting of the day - switch into Gaming mode.
+            # Last meeting of the day - switch into Chill mode 3 min after meeting.
             data = {'on': True, 'scene': scenes_dict[hue_scene_chill]}
-            start = event_dict[event]['end']
+            start = add_minutes(str2datetime(event_dict[event]['end']), 3)
+            start = datetime2str(start)
             b.create_group_schedule(event+'_last', start, groups_dict[hue_group], data, 'Calendar' )
             count += 1
             print('Start: ' + start + ' Scene: ' + hue_scene_chill)
@@ -210,7 +228,9 @@ def sync_calendar_with_hue():
             # more meetings to come  - signalized more meetings.
             if event_dict[event]['after'] >= 1:
                 data = {'on': True, 'scene': scenes_dict[hue_scene_meetinglater]}
-                start = event_dict[event]['end']
+                # Allow meetings to run over for 3 minutes.
+                start = add_minutes(str2datetime(event_dict[event]['end']), 3)
+                start = datetime2str(start)
                 b.create_group_schedule(event+'_more', start, groups_dict[hue_group], data, 'Calendar' )
                 count += 1
                 print('Start: ' + start + ' Scene: ' + hue_scene_meetinglater)
@@ -220,3 +240,6 @@ def sync_calendar_with_hue():
 
 def main():
     sync_calendar_with_hue()
+
+if __name__ == '__main__':
+    main()
