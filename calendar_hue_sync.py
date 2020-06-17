@@ -106,7 +106,7 @@ def sync_calendar_with_hue():
             # Set start to now if meeting has already started.
             if start_datetime <= datetime.datetime.now():
                 start_datetime = datetime.datetime.now()
-                start = datetime2str(end_datetime)(start_datetime)
+                start = datetime2str(start_datetime)
             # Calculate meeting duration
             duration = int((end_datetime - start_datetime).seconds / 60)
             # Calculate time before the meeting.
