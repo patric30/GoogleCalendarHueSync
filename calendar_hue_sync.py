@@ -18,11 +18,11 @@ SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 b = Bridge('192.168.178.66')
 # Define user.
 user_account = 'user@gmail.com'
-# Skip events created by these creators.
+# Skip events created by these users.
 blocked_creators = ['blocked@gmail.com']
 # Room to be controlled by hue bridge.
 hue_group = 'Office'
-# Available Scenes of this Room.
+# Available scenes of this room.
 heu_scene_meeting = 'Meeting'
 heu_scene_meetingsoon = 'MeetingSoon'
 hue_scene_meetinglater = 'MeetingLater'
