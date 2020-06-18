@@ -10,6 +10,7 @@ I am using Philips Hue Play Bar lights to:
 Using a manual power switch to turn on/off a desktop light works well but is clearly not sophisticated enough :-) 
 What if the lights would know about my meeting schedule and simply guide me through my day? 
 One light bar facing to me acts as the video brightener and the other one behind the screen to indicate upcoming meetings. 
+
 (See Calendar_Hue_Sync_Light_Setup.png to experience the setup and light scenes)
 
 Steps:
