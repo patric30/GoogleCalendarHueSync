@@ -3,9 +3,9 @@ Synchronize Google Calendar Meetings with Philips Hue Lights for better video co
 
 I am using Philips Hue Play Bar lights to: 
 
-     a) indicate my upcoming Google Calendar meetings  
+     a) Indicate upcoming Google Calendar VC meetings  
      
-     b) light up my face for better video quality 
+     b) Light up my face for better video quality and visibility
      
 Using a manual power switch to turn on/off a desktop light works well but is clearly not sophisticated enough :-) 
 What if the lights would know about my meeting schedule and simply guide me through my day? 
