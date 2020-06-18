@@ -17,6 +17,7 @@ Steps:
     - MeetingSoon (indicates that the meeting will start in 10 minutes)
     - Meeting (Light setting during the meeting)
     - Chill (Light setting after the last meeting of the day)
+    
     (See room and scene setup in the Hue app: Hue_Scene_Settings.png)
 7. Define your prefered light settings for each scene.
 8. Press Connect Button on bridge before first run.
