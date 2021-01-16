@@ -19,7 +19,7 @@ b = Bridge('192.168.178.66')
 # Define user.
 user_account = '123@google.com'
 # Skip events created by these users.
-blocked_creators = ['345@gmail.com']
+blocked_creators = ['456@gmail.com']
 # Room to be controlled by hue bridge.
 hue_group = 'Office'
 # Available scenes of this room.
@@ -204,7 +204,7 @@ def sync_calendar_with_hue():
             start = datetime2str(datetime.datetime.now())
             # Only set schedule if meeting is more than 10 minutes away.
             if datetime.datetime.now() < add_minutes(str2datetime(event_dict[event]['start']), -10):
-                b.create_group_schedule(event+'_first', start, groups_dict[hue_group], data, 'Calendar' )
+                b.create_group_schedule(str(count)+'_first', start, groups_dict[hue_group], data, 'Calendar' )
                 print('Start: ' + start + ' Scene: ' + hue_scene_meetinglater)
             first_event = False
         # Indicate meeting to start soon if there was a >10 min break between meetings.
@@ -212,13 +212,13 @@ def sync_calendar_with_hue():
             start = add_minutes(str2datetime(event_dict[event]['start']), -10)
             start = datetime2str(start)
             data = {'on': True, 'scene': scenes_dict[heu_scene_meetingsoon]}
-            b.create_group_schedule(event+'_soon', start, groups_dict[hue_group], data, 'Calendar' )
+            b.create_group_schedule(str(count)+'_soon', start, groups_dict[hue_group], data, 'Calendar' )
             count += 1
             print('Start: ' + start + ' Scene: ' + heu_scene_meetingsoon)
         # Start actual meeting.
         data = {'on': True, 'scene': scenes_dict[heu_scene_meeting]}
         start = event_dict[event]['start']
-        b.create_group_schedule(event+'_on', start, groups_dict[hue_group], data, 'Calendar' )
+        b.create_group_schedule(str(count)+'_on', start, groups_dict[hue_group], data, 'Calendar' )
         count += 1
         print('Start: ' + start + " Scene: " + heu_scene_meeting)
         if event_dict[event]['after'] == 999:
@@ -226,13 +226,13 @@ def sync_calendar_with_hue():
             data = {'on': True, 'scene': scenes_dict[hue_scene_chill]}
             start = add_minutes(str2datetime(event_dict[event]['end']), 3)
             start = datetime2str(start)
-            b.create_group_schedule(event+'_last', start, groups_dict[hue_group], data, 'Calendar' )
+            b.create_group_schedule(str(count)+'_last', start, groups_dict[hue_group], data, 'Calendar' )
             count += 1
             print('Start: ' + start + ' Scene: ' + hue_scene_chill)
             # Turn off lights at 10pm.
             data = {'on': False}
             start = datetime.datetime.now().strftime('%Y-%m-%d')+'T22:00:00'
-            b.create_group_schedule(event+'_off', start, groups_dict[hue_group], data, 'Calendar' )
+            b.create_group_schedule(str(count)+'_off', start, groups_dict[hue_group], data, 'Calendar' )
             count += 1
             print('Start: ' + start + ' Scene: ' + 'OFF')
         else:
@@ -242,7 +242,7 @@ def sync_calendar_with_hue():
                 # Allow meetings to run over for 3 minutes.
                 start = add_minutes(str2datetime(event_dict[event]['end']), 3)
                 start = datetime2str(start)
-                b.create_group_schedule(event+'_more', start, groups_dict[hue_group], data, 'Calendar' )
+                b.create_group_schedule(str(count)+'_more', start, groups_dict[hue_group], data, 'Calendar' )
                 count += 1
                 print('Start: ' + start + ' Scene: ' + hue_scene_meetinglater)
 
