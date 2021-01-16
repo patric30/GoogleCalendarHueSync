@@ -17,9 +17,9 @@ SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 # Connect Philips Hue Bridge.
 b = Bridge('192.168.178.66')
 # Define user.
-user_account = 'user@gmail.com'
+user_account = '123@google.com'
 # Skip events created by these users.
-blocked_creators = ['blocked@gmail.com']
+blocked_creators = ['345@gmail.com']
 # Room to be controlled by hue bridge.
 hue_group = 'Office'
 # Available scenes of this room.
@@ -65,29 +65,30 @@ def sync_calendar_with_hue():
     service = build('calendar', 'v3', credentials=creds)
 
     # Call the Calendar API
-    now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
+    now = add_minutes(datetime.datetime.utcnow(), -200).isoformat() + 'Z' # 'Z' indicates UTC time
     print('Getting upcoming Calendar events:')
     events_result = service.events().list(calendarId='primary', timeMin=now,
                                         maxResults=20, singleEvents=True,
                                         orderBy='startTime').execute()
     events = events_result.get('items', [])
-
     if not events:
         print('No upcoming events found.')
-    # Identify VC events and add into list.
-    last_event_id = ''
+
+
+    # Create a sorted event dict.
     for event in events:
         id          = event.get('id', '')[0:26]
         attendees   = event.get('attendees', [])
         creator     = event.get('creator', {})
         hangoutLink = event.get('hangoutLink', '')
+        summary     = event.get('summary', '')
         responseStatus = ''
         # Get event response status.
         for attendee in attendees:
             if attendee['email'] == user_account:
                 responseStatus = attendee['responseStatus']
         # Check if event is accepted, with a hangouts link, not created by blocked creators and more than 1 participatns.
-        if responseStatus == 'accepted' and hangoutLink != '' and creator['email'] not in blocked_creators and len(attendees) > 1:
+        if responseStatus == 'accepted' and hangoutLink != '' and creator['email'] not in blocked_creators and (len(attendees) > 1 or summary.find('Interview') != -1):
             start = event['start'].get('dateTime', event['start'].get('date'))[:-6]
             end = event['end'].get('dateTime', event['end'].get('date'))[:-6]
             start_datetime = str2datetime(start)
@@ -95,6 +96,7 @@ def sync_calendar_with_hue():
             end_minute = int(end_datetime.strftime('%M'))
             end_day = int(end_datetime.strftime('%d'))
             now_day = int(datetime.datetime.now().strftime('%d'))
+            now = datetime.datetime.now()
             # Round up end time to full half hour.
             if end_minute > 0 and end_minute<= 29:
                 end_datetime = add_minutes(end_datetime, 30 - end_minute)
@@ -104,57 +106,66 @@ def sync_calendar_with_hue():
                 end_datetime = add_minutes(end_datetime, 60 - end_minute)
                 end = datetime2str(end_datetime)
             # Set start to now if meeting has already started.
-            if start_datetime <= datetime.datetime.now():
-                start_datetime = datetime.datetime.now()
+            if start_datetime <= now and end_datetime > now:
+                start_datetime = now
                 start = datetime2str(start_datetime)
             # Calculate meeting duration
             duration = int((end_datetime - start_datetime).seconds / 60)
-            # Calculate time before the meeting.
-            if last_event_id == '':
-                before = duration_minutes(start_datetime, datetime.datetime.now())
-            else:
-                last_end_datetime = str2datetime(event_dict[last_event_id]['end'])
-                if last_end_datetime > start_datetime:
-                    before = 0
-                else:
-                    before = duration_minutes(start_datetime, last_end_datetime)
-            # Only continue for events on the same day.
-            if end_day == now_day:
+            # Only continue for running or upcoming events on the same day.
+            if end_day == now_day and end_datetime > now:
                 event_detail = {}
                 event_detail['title'] = event['summary']
                 event_detail['start'] = start
                 event_detail['end'] = end
                 event_detail['duration'] = duration
-                event_detail['before'] = before
+                event_detail['before'] = 0
                 # Default value to indicate last event of day.
                 event_detail['after'] = 999
                 # Add event details to dict.
-                event_dict[id] = event_detail
-                # Set time after the meeting for previous event.
-                if last_event_id != '':
-                    event_dict[last_event_id]['after'] = before
-                last_event_id = id
-            else:
-                # Exit loop after last event of the day
-                break
-
-    # Resolve overlapping events and print all events.
-    for event in event_dict:
+                event_dict[start+id] = event_detail
+            
+        
+    # Calculate time before and after each meeting.
+    last_event_id = ''
+    for event, v in sorted(event_dict.items()):
         start = str2datetime(event_dict[event]['start'])
         end = str2datetime(event_dict[event]['end'])
-        for check_event in event_dict:
+        # Calculate time before the meeting.
+        if last_event_id == '':
+            if start < datetime.datetime.now():
+                before = 0
+            else:
+                before = duration_minutes(start, datetime.datetime.now())
+        else:
+            last_end = str2datetime(event_dict[last_event_id]['end'])
+            if last_end > start_datetime:
+                before = 0
+            else:
+                before = duration_minutes(start, last_end)
+        event_dict[event]['before'] = before
+        # Resolve overlapping events
+        for check_event, v in sorted(event_dict.items()):
             check_start = str2datetime(event_dict[check_event]['start'])
             check_end = str2datetime(event_dict[check_event]['end'])
             if check_start < start and check_end > start:
                 event_dict[event]['before'] = 0
             if check_end > end and check_start < end:
                 event_dict[event]['after'] = 0
-        print('Start: ' + event_dict[event]['start'] \
-              +  ', End: ' + event_dict[event]['end'] \
+
+        # Set time after the meeting for previous event.
+        if last_event_id != '':
+            event_dict[last_event_id]['after'] = before
+        last_event_id = event
+        
+    #Print Final Event List
+    for event, v in sorted(event_dict.items()):       
+        print('Start: '        + event_dict[event]['start'] \
+              + ', End: '      + event_dict[event]['end'] \
               + ', Duration: ' + str(event_dict[event]['duration']) \
-              + ', Before: ' + str(event_dict[event]['before']) \
-              + ', After: ' + str(event_dict[event]['after']) \
-              + ', Title: ' + event_dict[event]['title'])
+              + ', Before: '   + str(event_dict[event]['before']) \
+              + ', After: '    + str(event_dict[event]['after']) \
+              + ', Title: '    + event_dict[event]['title'])
+
 
     # Setup Schedule for Philips Hue lights.
     print('')
@@ -175,17 +186,17 @@ def sync_calendar_with_hue():
     # Delete old schedules creted by this script.
     count =  0
     schedules = b.get_schedule()
+    #print(schedules)
     for schedule in schedules:
         if schedules[schedule]['description'] == 'Calendar':
             b.delete_schedule(schedule)
             count += 1
-    if count > 0:
-        print(str(count) + ' remaining schedules deleted.')
-        print('')
+    print(str(count) + ' remaining schedules deleted.')
+    print('')
     # Set new schedules for each meeting.
     first_event = True
     count = 0
-    for event in event_dict:
+    for event,v in sorted(event_dict.items()):
         #print(event_dict)
         # Indicate upcoming meetings before first meeting.
         if first_event:
@@ -220,7 +231,7 @@ def sync_calendar_with_hue():
             print('Start: ' + start + ' Scene: ' + hue_scene_chill)
             # Turn off lights at 10pm.
             data = {'on': False}
-            start = datetime.datetime.now().strftime('%Y-%m-%d')+'T23:00:00'
+            start = datetime.datetime.now().strftime('%Y-%m-%d')+'T22:00:00'
             b.create_group_schedule(event+'_off', start, groups_dict[hue_group], data, 'Calendar' )
             count += 1
             print('Start: ' + start + ' Scene: ' + 'OFF')
