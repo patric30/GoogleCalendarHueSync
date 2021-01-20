@@ -15,11 +15,11 @@ from phue import Bridge
 # If modifying the scope, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 # Connect Philips Hue Bridge.
-b = Bridge('192.168.178.66')
+b = Bridge(<'Hue Bridge IP Address'>)
 # Define user.
-user_account = '123@google.com'
+user_account = 'MyGoogleUsername@google.com'
 # Skip events created by these users.
-blocked_creators = ['456@gmail.com']
+blocked_creators = ['BlockedUsers@gmail.com']
 # Room to be controlled by hue bridge.
 hue_group = 'Office'
 # Available scenes of this room.
@@ -65,7 +65,8 @@ def sync_calendar_with_hue():
     service = build('calendar', 'v3', credentials=creds)
 
     # Call the Calendar API
-    now = add_minutes(datetime.datetime.utcnow(), -200).isoformat() + 'Z' # 'Z' indicates UTC time
+    # Make sure the currently active meeting is included (-180 minutes).
+    now = add_minutes(datetime.datetime.utcnow(), -180).isoformat() + 'Z' # 'Z' indicates UTC time
     print('Getting upcoming Calendar events:')
     events_result = service.events().list(calendarId='primary', timeMin=now,
                                         maxResults=20, singleEvents=True,
